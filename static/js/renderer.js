@@ -5,6 +5,7 @@
 const Renderer = {
     svg: null,
     layers: {},
+    cornerUsage: {},  // 角使用计数 { "taskId_cornerName": count }
 
     // 连接线调色板（循环使用）
     connectionColors: ['#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#f39c12', '#1abc9c', '#e91e63', '#00bcd4'],
@@ -82,12 +83,16 @@ const Renderer = {
 
     /**
      * 计算基础路径（不使用偏移）
+     * @returns {Object} { points: Array, corners: Array } - 路径点和经过的角
      */
     calculateBasePath(sourceLayout, targetLayout) {
         const sourceGrid = sourceLayout.grid;
         const targetGrid = targetLayout.grid;
+        const sourceId = sourceLayout.id;
+        const targetId = targetLayout.id;
 
         const points = [sourceGrid.center];
+        const corners = [];
 
         const columnDiff = targetLayout.column - sourceLayout.column;
         const rowDiff = targetLayout.row - sourceLayout.row;
@@ -95,41 +100,93 @@ const Renderer = {
         if (columnDiff > 0) {
             if (rowDiff > 0) {
                 points.push(sourceGrid.bottomRight);
+                corners.push({ taskId: sourceId, cornerName: 'bottomRight' });
                 points.push({ x: targetGrid.topLeft.x, y: sourceGrid.bottomRight.y });
                 points.push(targetGrid.topLeft);
+                corners.push({ taskId: targetId, cornerName: 'topLeft' });
             } else if (rowDiff < 0) {
                 points.push(sourceGrid.topRight);
+                corners.push({ taskId: sourceId, cornerName: 'topRight' });
                 points.push({ x: targetGrid.bottomLeft.x, y: sourceGrid.topRight.y });
                 points.push(targetGrid.bottomLeft);
+                corners.push({ taskId: targetId, cornerName: 'bottomLeft' });
             } else {
                 points.push(sourceGrid.topRight);
+                corners.push({ taskId: sourceId, cornerName: 'topRight' });
                 points.push(targetGrid.topLeft);
+                corners.push({ taskId: targetId, cornerName: 'topLeft' });
             }
         } else if (columnDiff < 0) {
             if (rowDiff > 0) {
                 points.push(sourceGrid.bottomLeft);
+                corners.push({ taskId: sourceId, cornerName: 'bottomLeft' });
                 points.push({ x: targetGrid.topRight.x, y: sourceGrid.bottomLeft.y });
                 points.push(targetGrid.topRight);
+                corners.push({ taskId: targetId, cornerName: 'topRight' });
             } else if (rowDiff < 0) {
                 points.push(sourceGrid.topLeft);
+                corners.push({ taskId: sourceId, cornerName: 'topLeft' });
                 points.push({ x: targetGrid.bottomRight.x, y: sourceGrid.topLeft.y });
                 points.push(targetGrid.bottomRight);
+                corners.push({ taskId: targetId, cornerName: 'bottomRight' });
             } else {
                 points.push(sourceGrid.topLeft);
+                corners.push({ taskId: sourceId, cornerName: 'topLeft' });
                 points.push(targetGrid.topRight);
+                corners.push({ taskId: targetId, cornerName: 'topRight' });
             }
         } else {
             if (rowDiff > 0) {
                 points.push(sourceGrid.topLeft);
+                corners.push({ taskId: sourceId, cornerName: 'topLeft' });
                 points.push(targetGrid.bottomLeft);
+                corners.push({ taskId: targetId, cornerName: 'bottomLeft' });
             } else if (rowDiff < 0) {
                 points.push(sourceGrid.bottomLeft);
+                corners.push({ taskId: sourceId, cornerName: 'bottomLeft' });
                 points.push(targetGrid.topLeft);
+                corners.push({ taskId: targetId, cornerName: 'topLeft' });
             }
         }
 
         points.push(targetGrid.center);
-        return points;
+        return { points, corners };
+    },
+
+    /**
+     * 初始化角使用计数
+     */
+    initCornerUsage() {
+        this.cornerUsage = {};
+    },
+
+    /**
+     * 标记路径经过的角（计数加1）
+     */
+    markCornerUsed(taskId, cornerName) {
+        const key = `${taskId}_${cornerName}`;
+        this.cornerUsage[key] = (this.cornerUsage[key] || 0) + 1;
+    },
+
+    /**
+     * 根据路径经过的角获取 offset
+     * @param {Array} corners - 路径经过的角 [{ taskId, cornerName }, ...]
+     * @returns {number} offset 值
+     */
+    getOffsetForPath(corners) {
+        if (corners.length === 0) return 0;
+
+        // 找到经过的角中最大的使用次数
+        let maxUsage = 0;
+        corners.forEach(({ taskId, cornerName }) => {
+            const key = `${taskId}_${cornerName}`;
+            maxUsage = Math.max(maxUsage, this.cornerUsage[key] || 0);
+        });
+
+        // 返回 offset：偶数向上，奇数向下
+        const offsetAmount = 2;
+        const direction = maxUsage % 2 === 0 ? -1 : 1;
+        return maxUsage * offsetAmount * direction;
     },
 
     /**
@@ -141,23 +198,21 @@ const Renderer = {
 
     /**
      * 创建连接线 SVG 元素
+     * @param {number} sourceId - 源任务 ID
+     * @param {number} targetId - 目标任务 ID
+     * @param {Object} layoutMap - 布局映射
+     * @param {boolean} highlighted - 是否高亮
+     * @param {number} offsetY - Y 方向偏移量
      */
-    createConnectionElement(sourceId, targetId, layoutMap, highlighted = false, edgeIndex = 0) {
+    createConnectionElement(sourceId, targetId, layoutMap, highlighted = false, offsetY = 0) {
         const sourceLayout = layoutMap[sourceId];
         const targetLayout = layoutMap[targetId];
 
         // 计算基础路径
-        const basePath = this.calculateBasePath(sourceLayout, targetLayout);
-
-        // 根据 edgeIndex 计算偏移
-        // 偶数向上偏移，奇数向下偏移，每级偏移 2px
-        const offsetAmount = 2;
-        const level = Math.floor(edgeIndex / 2);
-        const direction = edgeIndex % 2 === 0 ? -1 : 1;
-        const offsetY = level * offsetAmount * direction;
+        const { points } = this.calculateBasePath(sourceLayout, targetLayout);
 
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        const offsetPath = this.applyOffset(basePath, 0, offsetY);
+        const offsetPath = this.applyOffset(points, 0, offsetY);
         path.setAttribute('d', offsetPath.map((p, i) => {
             return i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`;
         }).join('\n'));
@@ -175,6 +230,7 @@ const Renderer = {
      */
     render(tasks, layout, highlightedEdges = new Set()) {
         this.clear();
+        this.initCornerUsage();  // 初始化角使用计数
 
         // 渲染九宫格
         tasks.forEach(task => {
@@ -182,38 +238,41 @@ const Renderer = {
             this.layers.grids.appendChild(grid);
         });
 
-        // 渲染连接线
-        const renderedConnections = new Set();
-
-        // 统计每个源任务的出边数量
-        const sourceEdgeCount = {};
+        // 第一遍：计算所有路径需要的 offset（不渲染）
+        const pathInfos = [];
         tasks.forEach(task => {
             task.dependencies.forEach(depId => {
-                sourceEdgeCount[depId] = (sourceEdgeCount[depId] || 0) + 1;
+                const sourceLayout = layout[depId];
+                const targetLayout = layout[task.id];
+                const { corners } = this.calculateBasePath(sourceLayout, targetLayout);
+                const offset = this.getOffsetForPath(corners);
+
+                pathInfos.push({
+                    sourceId: depId,
+                    targetId: task.id,
+                    layoutMap: layout,
+                    corners,
+                    offset,
+                    key: `${depId}-${task.id}`
+                });
+
+                // 标记这些角将被使用
+                corners.forEach(c => this.markCornerUsed(c.taskId, c.cornerName));
             });
         });
 
-        // 为每个源任务分配 edgeIndex 偏移量
-        const sourceEdgeOffset = {};
-        let currentOffset = 0;
-        Object.keys(sourceEdgeCount).forEach(sourceId => {
-            sourceEdgeOffset[sourceId] = currentOffset;
-            currentOffset += sourceEdgeCount[sourceId];
-        });
-
-        tasks.forEach(task => {
-            task.dependencies.forEach((depId, idx) => {
-                const key = `${depId}-${task.id}`;
-                if (!renderedConnections.has(key)) {
-                    const highlighted = highlightedEdges.has(key);
-                    const edgeIndex = (sourceEdgeOffset[depId] || 0) + idx;
-                    const connection = this.createConnectionElement(
-                        depId, task.id, layout, highlighted, edgeIndex
-                    );
-                    this.layers.connections.appendChild(connection);
-                    renderedConnections.add(key);
-                }
-            });
+        // 第二遍：渲染所有连接线
+        const renderedConnections = new Set();
+        pathInfos.forEach(info => {
+            if (!renderedConnections.has(info.key)) {
+                const highlighted = highlightedEdges.has(info.key);
+                const connection = this.createConnectionElement(
+                    info.sourceId, info.targetId,
+                    info.layoutMap, highlighted, info.offset
+                );
+                this.layers.connections.appendChild(connection);
+                renderedConnections.add(info.key);
+            }
         });
 
         // 高亮处理

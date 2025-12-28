@@ -138,6 +138,7 @@ const Layout = {
         const layout = {};
         Object.entries(positions).forEach(([taskId, pos]) => {
             layout[taskId] = {
+                id: parseInt(taskId),
                 ...pos,
                 grid: this.calculateGridBounds(pos)
             };
