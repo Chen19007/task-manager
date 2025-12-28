@@ -56,7 +56,9 @@ uvicorn main:app --reload
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/api/tasks/{id}/dependencies` | 添加依赖 |
-| DELETE | `/api/tasks/{id}/dependencies/{dep_id}` | 删除依赖 |
+| DELETE | `/api/tasks/{id}/dependencies/{depends_on_id}` | 删除依赖 |
+
+**删除依赖说明**: `DELETE /api/tasks/2/dependencies/1` 表示删除"任务2依赖任务1"的关系 |
 
 ## 使用示例
 
@@ -98,6 +100,14 @@ curl -X PUT "http://localhost:8000/api/tasks/1" \
 
 ```bash
 curl "http://localhost:8000/api/tasks/1"
+```
+
+### 删除依赖关系
+
+删除"任务2依赖任务1"的关系：
+
+```bash
+curl -X DELETE "http://localhost:8000/api/tasks/2/dependencies/1"
 ```
 
 返回示例：

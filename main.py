@@ -145,21 +145,31 @@ def add_dependency(task_id: int, dep: schemas.DependencyCreate, db: Session = De
     )
 
 
-@app.delete("/api/tasks/{task_id}/dependencies/{dep_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_dependency(task_id: int, dep_id: int, db: Session = Depends(get_db)):
+@app.delete("/api/tasks/{task_id}/dependencies/{depends_on_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_dependency(task_id: int, depends_on_id: int, db: Session = Depends(get_db)):
     """
     删除依赖关系
-    dep_id: Dependency 表中的记录ID
+
+    参数:
+    - task_id: 任务ID
+    - depends_on_id: 被依赖的任务ID
+
+    示例: DELETE /api/tasks/2/dependencies/1 表示删除"任务2依赖任务1"的关系
     """
     # 验证任务存在
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
-    # 查找依赖关系
+    # 验证被依赖的任务存在
+    prerequisite = db.query(models.Task).filter(models.Task.id == depends_on_id).first()
+    if not prerequisite:
+        raise HTTPException(status_code=404, detail="被依赖的任务不存在")
+
+    # 查找并删除依赖关系
     db_dep = db.query(models.Dependency).filter(
-        models.Dependency.id == dep_id,
-        models.Dependency.task_id == task_id
+        models.Dependency.task_id == task_id,
+        models.Dependency.depends_on_id == depends_on_id
     ).first()
     if not db_dep:
         raise HTTPException(status_code=404, detail="依赖关系不存在")
