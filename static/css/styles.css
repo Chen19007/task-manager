@@ -1,0 +1,404 @@
+/* ==================== CSS 变量定义 ==================== */
+:root {
+    --task-width: 160px;
+    --task-height: 60px;
+    --grid-width: 200px;
+    --grid-height: 100px;
+    --column-width: 220px;
+    --row-height: 120px;
+
+    /* 颜色主题 */
+    --color-pending: #e3f2fd;
+    --color-pending-border: #2196f3;
+    --color-in-progress: #fff3e0;
+    --color-in-progress-border: #ff9800;
+    --color-completed: #e8f5e9;
+    --color-completed-border: #4caf50;
+
+    --color-text: #333;
+    --color-text-light: #666;
+    --color-border: #ddd;
+    --color-grid: #ddd;
+    --color-connection: #999;
+    --color-connection-highlight: #2196f3;
+}
+
+/* ==================== 全局样式 ==================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f5f5f5;
+    color: var(--color-text);
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ==================== 工具栏 ==================== */
+#toolbar {
+    background: white;
+    padding: 15px 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    z-index: 100;
+}
+
+#toolbar h1 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-right: auto;
+}
+
+.toolbar-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: var(--color-pending-border);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #1976d2;
+    box-shadow: 0 2px 8px rgba(33,150,243,0.3);
+}
+
+.btn-secondary {
+    background: #f5f5f5;
+    color: var(--color-text);
+}
+
+.btn-secondary:hover {
+    background: #e0e0e0;
+}
+
+#legend {
+    display: flex;
+    gap: 20px;
+    margin-left: 20px;
+}
+
+.legend-item {
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.legend-item.pending { color: var(--color-pending-border); }
+.legend-item.in_progress { color: var(--color-in-progress-border); }
+.legend-item.completed { color: var(--color-completed-border); }
+
+/* ==================== 主绘图区域 ==================== */
+#graph-container {
+    flex: 1;
+    position: relative;
+    overflow: auto;
+    background: #fafafa;
+}
+
+#dependency-graph {
+    display: block;
+    min-width: 100%;
+    min-height: 100%;
+}
+
+/* ==================== SVG 元素样式 ==================== */
+/* 九宫格虚线框 */
+.task-grid rect {
+    stroke: var(--color-grid);
+    stroke-width: 1;
+    stroke-dasharray: 5,5;
+    fill: none;
+}
+
+/* 任务方块 */
+.task-node {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.task-node rect {
+    stroke-width: 2;
+}
+
+.task-node.pending rect {
+    fill: var(--color-pending);
+    stroke: var(--color-pending-border);
+}
+
+.task-node.in_progress rect {
+    fill: var(--color-in-progress);
+    stroke: var(--color-in-progress-border);
+}
+
+.task-node.completed rect {
+    fill: var(--color-completed);
+    stroke: var(--color-completed-border);
+}
+
+.task-node:hover {
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+}
+
+.task-node text {
+    font-size: 14px;
+    font-weight: 500;
+    fill: var(--color-text);
+    pointer-events: none;
+}
+
+/* 连接线 */
+.connection {
+    fill: none;
+    stroke: var(--color-connection);
+    stroke-width: 1.5;
+    opacity: 0.3;
+    transition: all 0.3s;
+}
+
+.connection-highlight {
+    fill: none;
+    stroke: var(--color-connection-highlight);
+    stroke-width: 2.5;
+    opacity: 1;
+}
+
+/* ==================== 右键菜单 ==================== */
+.context-menu {
+    position: fixed;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    padding: 8px 0;
+    min-width: 180px;
+    z-index: 1000;
+}
+
+.context-menu.hidden {
+    display: none;
+}
+
+.context-menu > div {
+    padding: 10px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.context-menu > div:hover {
+    background: #f5f5f5;
+}
+
+/* ==================== 模态对话框 ==================== */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 400px;
+    max-width: 500px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+.modal-content h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: var(--color-text);
+}
+
+/* ==================== 表单样式 ==================== */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text);
+    margin-bottom: 6px;
+}
+
+.form-group input[type="text"],
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.form-group input[type="text"]:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--color-pending-border);
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.form-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 24px;
+}
+
+/* ==================== 依赖列表样式 ==================== */
+.dep-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+}
+
+.dep-item {
+    padding: 12px 16px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--color-border);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.dep-item:last-child {
+    border-bottom: none;
+}
+
+.dep-item:hover {
+    background: #f5f5f5;
+}
+
+.dep-item-empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--color-text-light);
+    font-size: 14px;
+}
+
+/* ==================== 加载动画 ==================== */
+.loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    z-index: 999;
+}
+
+.loading.hidden {
+    display: none;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--color-pending-border);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading span {
+    font-size: 14px;
+    color: var(--color-text-light);
+}
+
+/* ==================== Toast 提示 ==================== */
+.toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1001;
+    transition: all 0.3s;
+}
+
+.toast.hidden {
+    display: none;
+}
+
+.toast.success {
+    background: #4caf50;
+    color: white;
+}
+
+.toast.error {
+    background: #f44336;
+    color: white;
+}
+
+/* ==================== 滚动条样式 ==================== */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}

@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -25,6 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 挂载静态文件目录
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 # ==================== 任务 CRUD 接口 ====================
 
@@ -33,6 +37,22 @@ def get_all_tasks(db: Session = Depends(get_db)):
     """获取所有任务"""
     tasks = db.query(models.Task).all()
     return tasks
+
+
+@app.get("/api/tasks/with-dependencies", response_model=List[schemas.TaskWithDependencies])
+def get_all_tasks_with_dependencies(db: Session = Depends(get_db)):
+    """获取所有任务及其依赖关系（一次性返回完整数据）"""
+    tasks = db.query(models.Task).all()
+    result = []
+    for task in tasks:
+        dependencies = [d.depends_on_id for d in task.dependencies]
+        dependents = [d.task_id for d in task.dependents]
+        result.append(schemas.TaskWithDependencies(
+            **schemas.TaskResponse.model_validate(task).model_dump(),
+            dependencies=dependencies,
+            dependents=dependents
+        ))
+    return result
 
 
 @app.post("/api/tasks", response_model=schemas.TaskResponse, status_code=status.HTTP_201_CREATED)
