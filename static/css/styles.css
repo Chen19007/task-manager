@@ -201,7 +201,6 @@ body {
 /* 连接线 */
 .connection {
     fill: none;
-    stroke: var(--color-connection);
     stroke-width: 1.5;
     opacity: 0.3;
     transition: all 0.3s;
@@ -209,7 +208,6 @@ body {
 
 .connection-highlight {
     fill: none;
-    stroke: var(--color-connection-highlight);
     stroke-width: 2.5;
     opacity: 1;
 }

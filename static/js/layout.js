@@ -8,11 +8,11 @@ const Layout = {
         taskWidth: 160,
         taskHeight: 60,
         gridWidth: 200,
-        gridHeight: 100,
-        columnWidth: 200,  // 等于 gridWidth，九宫格水平相切
-        rowHeight: 100,    // 等于 gridHeight，九宫格垂直相切
+        gridHeight: 160,
+        columnWidth: 200,
+        rowHeight: 160,
         marginLeft: 50,
-        marginTop: 50
+        marginTop: 100
     },
 
     /**

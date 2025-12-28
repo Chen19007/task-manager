@@ -6,6 +6,9 @@ const Renderer = {
     svg: null,
     layers: {},
 
+    // 连接线调色板（循环使用）
+    connectionColors: ['#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#f39c12', '#1abc9c', '#e91e63', '#00bcd4'],
+
     /**
      * 初始化渲染器
      */
@@ -30,7 +33,6 @@ const Renderer = {
         group.setAttribute('class', 'task-grid');
         group.setAttribute('data-task-id', task.id);
 
-        // 九宫格矩形（虚线边框，方形无圆角）
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', grid.topLeft.x);
         rect.setAttribute('y', grid.topLeft.y);
@@ -47,16 +49,12 @@ const Renderer = {
 
     /**
      * 创建任务方块 SVG 元素
-     * @param {Object} task - 任务对象
-     * @param {Object} layout - 布局信息
-     * @returns {SVGGElement} SVG 元素
      */
     createTaskElement(task, layout) {
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         group.setAttribute('class', `task-node ${task.status}`);
         group.setAttribute('data-task-id', task.id);
 
-        // 背景矩形
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', layout.x);
         rect.setAttribute('y', layout.y);
@@ -64,7 +62,6 @@ const Renderer = {
         rect.setAttribute('height', Layout.CONFIG.taskHeight);
         rect.setAttribute('rx', '8');
 
-        // 标题文本
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', layout.x + Layout.CONFIG.taskWidth / 2);
         text.setAttribute('y', layout.y + Layout.CONFIG.taskHeight / 2);
@@ -72,7 +69,6 @@ const Renderer = {
         text.setAttribute('dominant-baseline', 'middle');
         text.setAttribute('class', 'task-title');
 
-        // 截断长文本
         const maxChars = 15;
         const displayTitle = task.title.length > maxChars
             ? task.title.substring(0, maxChars) + '...'
@@ -81,113 +77,101 @@ const Renderer = {
 
         group.appendChild(rect);
         group.appendChild(text);
-
         return group;
     },
 
     /**
-     * 计算曼哈顿路由路径（走相邻外框边，选择相对方向的角）
-     * 根据相对位置选择方向一致的出口点和入口点
-     * @param {Object} sourceLayout - 源任务布局
-     * @param {Object} targetLayout - 目标任务布局
-     * @returns {string} SVG 路径字符串
+     * 计算基础路径（不使用偏移）
      */
-    calculateConnectionPath(sourceLayout, targetLayout) {
+    calculateBasePath(sourceLayout, targetLayout) {
         const sourceGrid = sourceLayout.grid;
         const targetGrid = targetLayout.grid;
-        const start = sourceGrid.center;
-        const end = targetGrid.center;
 
-        const points = [start];
+        const points = [sourceGrid.center];
 
-        // 计算相对位置
         const columnDiff = targetLayout.column - sourceLayout.column;
         const rowDiff = targetLayout.row - sourceLayout.row;
 
         if (columnDiff > 0) {
-            // 目标在右侧
             if (rowDiff > 0) {
-                // 目标在右下方：从源右下角 → 目标左上角
                 points.push(sourceGrid.bottomRight);
                 points.push({ x: targetGrid.topLeft.x, y: sourceGrid.bottomRight.y });
                 points.push(targetGrid.topLeft);
             } else if (rowDiff < 0) {
-                // 目标在右上方：从源右上角 → 目标左下角
                 points.push(sourceGrid.topRight);
                 points.push({ x: targetGrid.bottomLeft.x, y: sourceGrid.topRight.y });
                 points.push(targetGrid.bottomLeft);
             } else {
-                // 目标在同一行：从源右上角 → 目标左上角
                 points.push(sourceGrid.topRight);
                 points.push(targetGrid.topLeft);
             }
         } else if (columnDiff < 0) {
-            // 目标在左侧
             if (rowDiff > 0) {
-                // 目标在左下方：从源左下角 → 目标右上角
                 points.push(sourceGrid.bottomLeft);
                 points.push({ x: targetGrid.topRight.x, y: sourceGrid.bottomLeft.y });
                 points.push(targetGrid.topRight);
             } else if (rowDiff < 0) {
-                // 目标在左上方：从源左上角 → 目标右下角
                 points.push(sourceGrid.topLeft);
                 points.push({ x: targetGrid.bottomRight.x, y: sourceGrid.topLeft.y });
                 points.push(targetGrid.bottomRight);
             } else {
-                // 目标在同一行：从源左上角 → 目标右上角
                 points.push(sourceGrid.topLeft);
                 points.push(targetGrid.topRight);
             }
         } else {
-            // 同列
             if (rowDiff > 0) {
-                // 目标在下方：从源顶角 → 目标底角
                 points.push(sourceGrid.topLeft);
                 points.push(targetGrid.bottomLeft);
             } else if (rowDiff < 0) {
-                // 目标在上方：从源底角 → 目标顶角
                 points.push(sourceGrid.bottomLeft);
                 points.push(targetGrid.topLeft);
-            } else {
-                // 同一位置（不可能）
             }
         }
 
-        points.push(end);
+        points.push(targetGrid.center);
+        return points;
+    },
 
-        // 转换为SVG路径字符串
-        return points.map((p, i) => {
-            return i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`;
-        }).join('\n');
+    /**
+     * 对路径应用偏移
+     */
+    applyOffset(points, offsetX, offsetY) {
+        return points.map(p => ({ x: p.x + offsetX, y: p.y + offsetY }));
     },
 
     /**
      * 创建连接线 SVG 元素
-     * @param {number} sourceId - 源任务ID（被依赖的任务）
-     * @param {number} targetId -目标任务ID（依赖源任务的任务）
-     * @param {Object} layoutMap - 布局映射表
-     * @param {boolean} highlighted - 是否高亮
-     * @returns {SVGPathElement} SVG 元素
      */
-    createConnectionElement(sourceId, targetId, layoutMap, highlighted = false) {
+    createConnectionElement(sourceId, targetId, layoutMap, highlighted = false, edgeIndex = 0) {
         const sourceLayout = layoutMap[sourceId];
         const targetLayout = layoutMap[targetId];
 
+        // 计算基础路径
+        const basePath = this.calculateBasePath(sourceLayout, targetLayout);
+
+        // 根据 edgeIndex 计算偏移
+        // 偶数向上偏移，奇数向下偏移，每级偏移 2px
+        const offsetAmount = 2;
+        const level = Math.floor(edgeIndex / 2);
+        const direction = edgeIndex % 2 === 0 ? -1 : 1;
+        const offsetY = level * offsetAmount * direction;
+
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', this.calculateConnectionPath(sourceLayout, targetLayout));
+        const offsetPath = this.applyOffset(basePath, 0, offsetY);
+        path.setAttribute('d', offsetPath.map((p, i) => {
+            return i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`;
+        }).join('\n'));
         path.setAttribute('class', highlighted ? 'connection-highlight' : 'connection');
         path.setAttribute('data-source', sourceId);
         path.setAttribute('data-target', targetId);
-        path.setAttribute('marker-end', highlighted ? 'url(#arrowhead-highlight)' : 'url(#arrowhead)');
+        // 去掉箭头
+        // path.setAttribute('marker-end', highlighted ? 'url(#arrowhead-highlight)' : 'url(#arrowhead)');
 
         return path;
     },
 
     /**
      * 渲染完整图形
-     * @param {Array} tasks - 所有任务列表
-     * @param {Object} layout - 布局信息
-     * @param {Set} highlightedEdges - 需要高亮的边集合（格式：sourceId-targetId）
      */
     render(tasks, layout, highlightedEdges = new Set()) {
         this.clear();
@@ -200,14 +184,31 @@ const Renderer = {
 
         // 渲染连接线
         const renderedConnections = new Set();
+
+        // 统计每个源任务的出边数量
+        const sourceEdgeCount = {};
         tasks.forEach(task => {
             task.dependencies.forEach(depId => {
+                sourceEdgeCount[depId] = (sourceEdgeCount[depId] || 0) + 1;
+            });
+        });
+
+        // 为每个源任务分配 edgeIndex 偏移量
+        const sourceEdgeOffset = {};
+        let currentOffset = 0;
+        Object.keys(sourceEdgeCount).forEach(sourceId => {
+            sourceEdgeOffset[sourceId] = currentOffset;
+            currentOffset += sourceEdgeCount[sourceId];
+        });
+
+        tasks.forEach(task => {
+            task.dependencies.forEach((depId, idx) => {
                 const key = `${depId}-${task.id}`;
                 if (!renderedConnections.has(key)) {
-                    // 检查这条边是否需要高亮
                     const highlighted = highlightedEdges.has(key);
+                    const edgeIndex = (sourceEdgeOffset[depId] || 0) + idx;
                     const connection = this.createConnectionElement(
-                        depId, task.id, layout, highlighted
+                        depId, task.id, layout, highlighted, edgeIndex
                     );
                     this.layers.connections.appendChild(connection);
                     renderedConnections.add(key);
@@ -215,13 +216,16 @@ const Renderer = {
             });
         });
 
-        // 如果有高亮任务，降低非高亮连接线的透明度
+        // 高亮处理
         if (highlightedEdges.size > 0) {
             const allConnections = this.layers.connections.querySelectorAll('.connection');
             allConnections.forEach(conn => {
                 conn.style.opacity = '0.1';
             });
         }
+
+        // 整体调整连接线样式
+        this.adjustConnectionStyles(highlightedEdges);
 
         // 渲染任务方块
         tasks.forEach(task => {
@@ -242,32 +246,38 @@ const Renderer = {
     },
 
     /**
+     * 整体调整连接线样式（在渲染最后调用）
+     * @param {Set} highlightedEdges - 高亮的边集合
+     */
+    adjustConnectionStyles(highlightedEdges = new Set()) {
+        const allConnections = this.layers.connections.querySelectorAll('.connection, .connection-highlight');
+        allConnections.forEach((conn, index) => {
+            const color = this.connectionColors[index % this.connectionColors.length];
+            conn.style.stroke = color;
+        });
+    },
+
+    /**
      * 高亮特定任务的依赖路径
-     * @param {number} taskId - 任务ID
-     * @param {Array} tasks - 所有任务列表
-     * @param {Object} layout - 布局信息
      */
     highlightPaths(taskId, tasks, layout) {
-        // 记录需要高亮的边（格式：sourceId-targetId）
         const highlightedEdges = new Set();
 
-        // 上游路径：找依赖
         const findUpstream = (id) => {
             const t = tasks.find(task => task.id === id);
             if (t) {
                 t.dependencies.forEach(depId => {
-                    highlightedEdges.add(`${depId}-${id}`);  // depId → id
+                    highlightedEdges.add(`${depId}-${id}`);
                     findUpstream(depId);
                 });
             }
         };
         findUpstream(taskId);
 
-        // 下游路径：找被依赖
         const findDownstream = (id) => {
             tasks.forEach(t => {
                 if (t.dependencies.includes(id)) {
-                    highlightedEdges.add(`${id}-${t.id}`);  // id → t.id
+                    highlightedEdges.add(`${id}-${t.id}`);
                     findDownstream(t.id);
                 }
             });
