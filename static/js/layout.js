@@ -9,8 +9,8 @@ const Layout = {
         taskHeight: 60,
         gridWidth: 200,
         gridHeight: 100,
-        columnWidth: 220,
-        rowHeight: 120,
+        columnWidth: 200,  // 等于 gridWidth，九宫格水平相切
+        rowHeight: 100,    // 等于 gridHeight，九宫格垂直相切
         marginLeft: 50,
         marginTop: 50
     },

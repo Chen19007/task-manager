@@ -12,6 +12,7 @@ const Interaction = {
      */
     init() {
         this.setupTaskClick();
+        this.setupTaskHover();
         this.setupTaskDblClick();
         this.setupContextMenu();
         this.setupToolbar();
@@ -101,6 +102,9 @@ const Interaction = {
         menu.style.left = `${x}px`;
         menu.style.top = `${y}px`;
         menu.classList.remove('hidden');
+
+        // 隐藏悬浮框
+        this.hideDependencyTooltip();
 
         // 根据任务状态更新菜单项
         const task = this.tasks.find(t => t.id === taskId);
@@ -381,5 +385,103 @@ const Interaction = {
     setData(tasks, layout) {
         this.tasks = tasks;
         this.layout = layout;
+    },
+
+    /**
+     * 设置任务悬停事件
+     */
+    setupTaskHover() {
+        const tasksLayer = document.getElementById('tasks-layer');
+
+        // 鼠标进入任务节点
+        tasksLayer.addEventListener('mouseenter', (e) => {
+            const taskNode = e.target.closest('.task-node');
+            if (taskNode) {
+                const taskId = parseInt(taskNode.dataset.taskId);
+                this.showDependencyTooltip(taskId, e.clientX, e.clientY);
+            }
+        }, true);
+
+        // 鼠标离开任务节点
+        tasksLayer.addEventListener('mouseleave', (e) => {
+            const taskNode = e.target.closest('.task-node');
+            if (taskNode) {
+                this.hideDependencyTooltip();
+            }
+        }, true);
+    },
+
+    /**
+     * 显示依赖任务悬浮框
+     * @param {number} taskId - 任务ID
+     * @param {number} x - 鼠标X坐标
+     * @param {number} y - 鼠标Y坐标
+     */
+    showDependencyTooltip(taskId, x, y) {
+        // 检查是否有打开的对话框或右键菜单
+        if (document.querySelector('.modal:not(.hidden)') ||
+            document.querySelector('.context-menu:not(.hidden)')) {
+            return;
+        }
+
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task || task.dependencies.length === 0) {
+            return;
+        }
+
+        const tooltip = document.getElementById('tooltip');
+        const content = document.getElementById('tooltip-content');
+
+        // 清空现有内容
+        content.innerHTML = '';
+
+        // 添加依赖任务列表
+        task.dependencies.forEach(depId => {
+            const depTask = this.tasks.find(t => t.id === depId);
+            if (depTask) {
+                const item = document.createElement('div');
+                item.className = 'tooltip-item';
+                item.textContent = depTask.title;
+
+                // 点击跳转功能（高亮选中该依赖任务）
+                item.style.cursor = 'pointer';
+                item.onclick = () => {
+                    this.handleTaskClick(depId);
+                    this.hideDependencyTooltip();
+                };
+
+                content.appendChild(item);
+            }
+        });
+
+        // 定位悬浮框（在鼠标附近）
+        const offsetX = 15; // 偏移量，避免遮挡鼠标
+        const offsetY = 15;
+
+        // 确保不超出屏幕边界
+        let posX = x + offsetX;
+        let posY = y + offsetY;
+
+        // 先显示以获取尺寸
+        tooltip.classList.remove('hidden');
+        const tooltipRect = tooltip.getBoundingClientRect();
+
+        if (posX + tooltipRect.width > window.innerWidth) {
+            posX = x - tooltipRect.width - offsetX;
+        }
+        if (posY + tooltipRect.height > window.innerHeight) {
+            posY = y - tooltipRect.height - offsetY;
+        }
+
+        tooltip.style.left = `${posX}px`;
+        tooltip.style.top = `${posY}px`;
+    },
+
+    /**
+     * 隐藏依赖任务悬浮框
+     */
+    hideDependencyTooltip() {
+        const tooltip = document.getElementById('tooltip');
+        tooltip.classList.add('hidden');
     }
 };

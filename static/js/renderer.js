@@ -30,7 +30,7 @@ const Renderer = {
         group.setAttribute('class', 'task-grid');
         group.setAttribute('data-task-id', task.id);
 
-        // 九宫格矩形（虚线边框）
+        // 九宫格矩形（虚线边框，方形无圆角）
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', grid.topLeft.x);
         rect.setAttribute('y', grid.topLeft.y);
@@ -40,7 +40,6 @@ const Renderer = {
         rect.setAttribute('stroke', '#ddd');
         rect.setAttribute('stroke-width', '1');
         rect.setAttribute('stroke-dasharray', '5,5');
-        rect.setAttribute('rx', '4');
 
         group.appendChild(rect);
         return group;
@@ -87,7 +86,8 @@ const Renderer = {
     },
 
     /**
-     * 计算曼哈顿路由路径
+     * 计算曼哈顿路由路径（走相邻外框边，选择相对方向的角）
+     * 根据相对位置选择方向一致的出口点和入口点
      * @param {Object} sourceLayout - 源任务布局
      * @param {Object} targetLayout - 目标任务布局
      * @returns {string} SVG 路径字符串
@@ -98,37 +98,67 @@ const Renderer = {
         const start = sourceGrid.center;
         const end = targetGrid.center;
 
-        let path;
+        const points = [start];
 
-        // 根据相对位置选择路由策略
-        if (targetLayout.column > sourceLayout.column) {
-            // 目标在右侧：从源右侧出，从目标左侧入
-            const exitPoint = sourceGrid.rightCenter;
-            const entryPoint = targetGrid.leftCenter;
+        // 计算相对位置
+        const columnDiff = targetLayout.column - sourceLayout.column;
+        const rowDiff = targetLayout.row - sourceLayout.row;
 
-            path = `M ${start.x} ${start.y}
-                    L ${exitPoint.x} ${exitPoint.y}
-                    L ${entryPoint.x} ${entryPoint.y}
-                    L ${end.x} ${end.y}`;
-        } else if (targetLayout.column < sourceLayout.column) {
-            // 目标在左侧：从源左侧出，从目标右侧入
-            const exitPoint = sourceGrid.leftCenter;
-            const entryPoint = targetGrid.rightCenter;
-
-            path = `M ${start.x} ${start.y}
-                    L ${exitPoint.x} ${exitPoint.y}
-                    L ${entryPoint.x} ${entryPoint.y}
-                    L ${end.x} ${end.y}`;
+        if (columnDiff > 0) {
+            // 目标在右侧
+            if (rowDiff > 0) {
+                // 目标在右下方：从源右下角 → 目标左上角
+                points.push(sourceGrid.bottomRight);
+                points.push({ x: targetGrid.topLeft.x, y: sourceGrid.bottomRight.y });
+                points.push(targetGrid.topLeft);
+            } else if (rowDiff < 0) {
+                // 目标在右上方：从源右上角 → 目标左下角
+                points.push(sourceGrid.topRight);
+                points.push({ x: targetGrid.bottomLeft.x, y: sourceGrid.topRight.y });
+                points.push(targetGrid.bottomLeft);
+            } else {
+                // 目标在同一行：从源右上角 → 目标左上角
+                points.push(sourceGrid.topRight);
+                points.push(targetGrid.topLeft);
+            }
+        } else if (columnDiff < 0) {
+            // 目标在左侧
+            if (rowDiff > 0) {
+                // 目标在左下方：从源左下角 → 目标右上角
+                points.push(sourceGrid.bottomLeft);
+                points.push({ x: targetGrid.topRight.x, y: sourceGrid.bottomLeft.y });
+                points.push(targetGrid.topRight);
+            } else if (rowDiff < 0) {
+                // 目标在左上方：从源左上角 → 目标右下角
+                points.push(sourceGrid.topLeft);
+                points.push({ x: targetGrid.bottomRight.x, y: sourceGrid.topLeft.y });
+                points.push(targetGrid.bottomRight);
+            } else {
+                // 目标在同一行：从源左上角 → 目标右上角
+                points.push(sourceGrid.topLeft);
+                points.push(targetGrid.topRight);
+            }
         } else {
-            // 同列：垂直路由
-            const midY = (start.y + end.y) / 2;
-            path = `M ${start.x} ${start.y}
-                    L ${start.x} ${midY}
-                    L ${end.x} ${midY}
-                    L ${end.x} ${end.y}`;
+            // 同列
+            if (rowDiff > 0) {
+                // 目标在下方：从源顶角 → 目标底角
+                points.push(sourceGrid.topLeft);
+                points.push(targetGrid.bottomLeft);
+            } else if (rowDiff < 0) {
+                // 目标在上方：从源底角 → 目标顶角
+                points.push(sourceGrid.bottomLeft);
+                points.push(targetGrid.topLeft);
+            } else {
+                // 同一位置（不可能）
+            }
         }
 
-        return path;
+        points.push(end);
+
+        // 转换为SVG路径字符串
+        return points.map((p, i) => {
+            return i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`;
+        }).join('\n');
     },
 
     /**
@@ -157,9 +187,9 @@ const Renderer = {
      * 渲染完整图形
      * @param {Array} tasks - 所有任务列表
      * @param {Object} layout - 布局信息
-     * @param {Set} highlightedTasks - 需要高亮的任务ID集合
+     * @param {Set} highlightedEdges - 需要高亮的边集合（格式：sourceId-targetId）
      */
-    render(tasks, layout, highlightedTasks = new Set()) {
+    render(tasks, layout, highlightedEdges = new Set()) {
         this.clear();
 
         // 渲染九宫格
@@ -174,8 +204,8 @@ const Renderer = {
             task.dependencies.forEach(depId => {
                 const key = `${depId}-${task.id}`;
                 if (!renderedConnections.has(key)) {
-                    // 检查是否需要高亮
-                    const highlighted = highlightedTasks.has(task.id) || highlightedTasks.has(depId);
+                    // 检查这条边是否需要高亮
+                    const highlighted = highlightedEdges.has(key);
                     const connection = this.createConnectionElement(
                         depId, task.id, layout, highlighted
                     );
@@ -186,7 +216,7 @@ const Renderer = {
         });
 
         // 如果有高亮任务，降低非高亮连接线的透明度
-        if (highlightedTasks.size > 0) {
+        if (highlightedEdges.size > 0) {
             const allConnections = this.layers.connections.querySelectorAll('.connection');
             allConnections.forEach(conn => {
                 conn.style.opacity = '0.1';
@@ -218,34 +248,32 @@ const Renderer = {
      * @param {Object} layout - 布局信息
      */
     highlightPaths(taskId, tasks, layout) {
-        const task = tasks.find(t => t.id === taskId);
-        if (!task) return;
+        // 记录需要高亮的边（格式：sourceId-targetId）
+        const highlightedEdges = new Set();
 
-        const highlightedIds = new Set([taskId]);
-
-        // 添加上游依赖
-        const addUpstream = (id) => {
+        // 上游路径：找依赖
+        const findUpstream = (id) => {
             const t = tasks.find(task => task.id === id);
             if (t) {
                 t.dependencies.forEach(depId => {
-                    highlightedIds.add(depId);
-                    addUpstream(depId);
+                    highlightedEdges.add(`${depId}-${id}`);  // depId → id
+                    findUpstream(depId);
                 });
             }
         };
-        addUpstream(taskId);
+        findUpstream(taskId);
 
-        // 添加下游依赖
-        const addDownstream = (id) => {
+        // 下游路径：找被依赖
+        const findDownstream = (id) => {
             tasks.forEach(t => {
                 if (t.dependencies.includes(id)) {
-                    highlightedIds.add(t.id);
-                    addDownstream(t.id);
+                    highlightedEdges.add(`${id}-${t.id}`);  // id → t.id
+                    findDownstream(t.id);
                 }
             });
         };
-        addDownstream(taskId);
+        findDownstream(taskId);
 
-        this.render(tasks, layout, highlightedIds);
+        this.render(tasks, layout, highlightedEdges);
     }
 };

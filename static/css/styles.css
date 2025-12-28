@@ -210,6 +210,59 @@ body {
     background: #f5f5f5;
 }
 
+/* ==================== 悬浮框 ==================== */
+.tooltip {
+    position: fixed;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 12px;
+    min-width: 200px;
+    max-width: 300px;
+    z-index: 1000;
+    pointer-events: auto;
+    transition: opacity 0.2s;
+}
+
+.tooltip.hidden {
+    display: none;
+}
+
+.tooltip-header {
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.tooltip-content {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.tooltip-item {
+    padding: 6px 8px;
+    font-size: 13px;
+    color: #555;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.tooltip-item:hover {
+    background-color: #f5f5f5;
+    color: #2196f3;
+}
+
+.tooltip-empty {
+    padding: 8px;
+    font-size: 13px;
+    color: #999;
+    font-style: italic;
+}
+
 /* ==================== 模态对话框 ==================== */
 .modal {
     position: fixed;
