@@ -288,7 +288,7 @@ const Interaction = {
                     await API.updateTask(parseInt(taskId), data);
                     this.showToast('任务更新成功');
                 } else {
-                    await API.createTask(data);
+                    await API.createTask({ ...data, project_id: app.currentProjectId });
                     this.showToast('任务创建成功');
                 }
                 document.getElementById('task-dialog').classList.add('hidden');
@@ -354,7 +354,7 @@ const Interaction = {
      */
     async refreshData() {
         try {
-            this.tasks = await API.fetchAllTasks();
+            this.tasks = await API.fetchAllTasks(app.currentProjectId);
             this.layout = Layout.computeLayout(this.tasks);
             Renderer.render(this.tasks, this.layout);
         } catch (error) {

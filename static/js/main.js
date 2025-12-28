@@ -48,8 +48,11 @@ class App {
                 this.projects.push(defaultProject);
             }
 
-            // 设置当前项目
-            if (this.currentProjectId === null && this.projects.length > 0) {
+            // 设置当前项目（优先使用 localStorage 保存的值）
+            const savedProjectId = localStorage.getItem('currentProjectId');
+            if (savedProjectId && this.projects.some(p => p.id === parseInt(savedProjectId))) {
+                this.currentProjectId = parseInt(savedProjectId);
+            } else if (this.currentProjectId === null && this.projects.length > 0) {
                 this.currentProjectId = this.projects[0].id;
             }
 
@@ -68,6 +71,7 @@ class App {
         if (this.currentProjectId === projectId) return;
 
         this.currentProjectId = projectId;
+        localStorage.setItem('currentProjectId', projectId);
         await this.loadData();
         Interaction.updateProjectSelector(this.projects, this.currentProjectId);
     }
