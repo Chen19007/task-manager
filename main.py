@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 import models
 import schemas
@@ -13,8 +13,8 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Task Manager API",
-    description="轻量级个人任务管理系统，支持任务依赖管理",
-    version="1.0.0"
+    description="轻量级个人任务管理系统，支持任务依赖管理和项目管理",
+    version="2.0.0"
 )
 
 # 添加 CORS 支持
@@ -30,19 +30,139 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+# ==================== Project CRUD 接口 ====================
+
+@app.get("/api/projects", response_model=List[schemas.ProjectResponse])
+def get_all_projects(db: Session = Depends(get_db)):
+    """获取所有项目（含任务统计）"""
+    projects = db.query(models.Project).all()
+    result = []
+    for project in projects:
+        # 统计每个项目的任务数量
+        task_count = db.query(models.Task).filter(
+            models.Task.project_id == project.id
+        ).count()
+        result.append(schemas.ProjectResponse(
+            id=project.id,
+            name=project.name,
+            description=project.description,
+            color=project.color,
+            created_at=project.created_at,
+            task_count=task_count
+        ))
+    return result
+
+
+@app.get("/api/projects/{project_id}", response_model=schemas.ProjectResponse)
+def get_project(project_id: int, db: Session = Depends(get_db)):
+    """获取项目详情"""
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    task_count = db.query(models.Task).filter(
+        models.Task.project_id == project.id
+    ).count()
+
+    return schemas.ProjectResponse(
+        id=project.id,
+        name=project.name,
+        description=project.description,
+        color=project.color,
+        created_at=project.created_at,
+        task_count=task_count
+    )
+
+
+@app.post("/api/projects", response_model=schemas.ProjectResponse, status_code=status.HTTP_201_CREATED)
+def create_project(project: schemas.ProjectCreate, db: Session = Depends(get_db)):
+    """创建新项目"""
+    # 检查项目名是否已存在
+    existing = db.query(models.Project).filter(models.Project.name == project.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="项目名已存在")
+
+    db_project = models.Project(**project.model_dump())
+    db.add(db_project)
+    db.commit()
+    db.refresh(db_project)
+    return db_project
+
+
+@app.put("/api/projects/{project_id}", response_model=schemas.ProjectResponse)
+def update_project(project_id: int, project_update: schemas.ProjectUpdate, db: Session = Depends(get_db)):
+    """更新项目"""
+    db_project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not db_project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    update_data = project_update.model_dump(exclude_unset=True)
+
+    # 如果更新了项目名，检查是否重复
+    if "name" in update_data and update_data["name"] != db_project.name:
+        existing = db.query(models.Project).filter(
+            models.Project.name == update_data["name"],
+            models.Project.id != project_id
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="项目名已存在")
+
+    for field, value in update_data.items():
+        setattr(db_project, field, value)
+
+    db.commit()
+    db.refresh(db_project)
+    return db_project
+
+
+@app.delete("/api/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(project_id: int, db: Session = Depends(get_db)):
+    """删除项目（仅限空项目）"""
+    db_project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not db_project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    # 检查项目下是否还有任务
+    task_count = db.query(models.Task).filter(
+        models.Task.project_id == project_id
+    ).count()
+    if task_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无法删除：项目还有 {task_count} 个任务"
+        )
+
+    db.delete(db_project)
+    db.commit()
+    return None
+
+
 # ==================== 任务 CRUD 接口 ====================
 
 @app.get("/api/tasks", response_model=List[schemas.TaskResponse])
-def get_all_tasks(db: Session = Depends(get_db)):
-    """获取所有任务"""
-    tasks = db.query(models.Task).all()
+def get_all_tasks(
+    project_id: Optional[int] = Query(None, description="过滤指定项目的任务"),
+    db: Session = Depends(get_db)
+):
+    """获取所有任务（可选按项目过滤）"""
+    query = db.query(models.Task)
+    if project_id is not None:
+        query = query.filter(models.Task.project_id == project_id)
+    tasks = query.all()
     return tasks
 
 
 @app.get("/api/tasks/with-dependencies", response_model=List[schemas.TaskWithDependencies])
-def get_all_tasks_with_dependencies(db: Session = Depends(get_db)):
-    """获取所有任务及其依赖关系（一次性返回完整数据）"""
-    tasks = db.query(models.Task).all()
+def get_all_tasks_with_dependencies(
+    project_id: Optional[int] = Query(None, description="过滤指定项目的任务"),
+    db: Session = Depends(get_db)
+):
+    """获取所有任务及其依赖关系（可选按项目过滤）"""
+    query = db.query(models.Task)
+    if project_id is not None:
+        query = query.filter(models.Task.project_id == project_id)
+    tasks = query.all()
+
     result = []
     for task in tasks:
         dependencies = [d.depends_on_id for d in task.dependencies]
@@ -57,8 +177,19 @@ def get_all_tasks_with_dependencies(db: Session = Depends(get_db)):
 
 @app.post("/api/tasks", response_model=schemas.TaskResponse, status_code=status.HTTP_201_CREATED)
 def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
-    """创建新任务"""
-    db_task = models.Task(**task.model_dump())
+    """创建新任务（未指定 project_id 时使用默认项目）"""
+    # 如果未指定项目，使用默认项目（ID=1）
+    project_id = task.project_id if task.project_id is not None else 1
+
+    # 验证项目存在
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="指定的项目不存在")
+
+    # 创建任务
+    task_data = task.model_dump(exclude_unset=True)
+    task_data["project_id"] = project_id
+    db_task = models.Task(**task_data)
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
@@ -234,7 +365,7 @@ def root():
     return {
         "message": "Task Manager API",
         "docs": "/docs",
-        "version": "1.0.0"
+        "version": "2.0.0"
     }
 
 

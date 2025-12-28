@@ -4,6 +4,19 @@ from sqlalchemy.sql import func
 from database import Base
 
 
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True)
+    description = Column(Text)
+    color = Column(String(7), default="#2196f3")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # 与 Task 的一对多关系
+    tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+
+
 class Task(Base):
     __tablename__ = "tasks"
 
@@ -11,7 +24,11 @@ class Task(Base):
     title = Column(String(200), nullable=False)
     description = Column(Text)
     status = Column(String(20), default="pending")  # pending, in_progress, completed
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # 所属项目
+    project = relationship("Project", back_populates="tasks")
 
     # 依赖关系：当前任务被哪些任务依赖（其他任务依赖当前任务）
     dependents = relationship(

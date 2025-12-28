@@ -18,6 +18,7 @@ const Interaction = {
         this.setupToolbar();
         this.setupDialogs();
         this.setupGlobalClick();
+        this.setupProjectManagement();
     },
 
     /**
@@ -483,5 +484,185 @@ const Interaction = {
     hideDependencyTooltip() {
         const tooltip = document.getElementById('tooltip');
         tooltip.classList.add('hidden');
+    },
+
+    /**
+     * 设置项目管理
+     */
+    setupProjectManagement() {
+        // Project 切换
+        document.getElementById('project-select').addEventListener('change', async (e) => {
+            const projectId = parseInt(e.target.value);
+            await app.switchProject(projectId);
+        });
+
+        // 管理项目按钮
+        document.getElementById('manage-projects-btn').addEventListener('click', () => {
+            this.showProjectDialog();
+        });
+
+        // 关闭项目对话框
+        document.getElementById('close-project-dialog-btn').addEventListener('click', () => {
+            document.getElementById('project-dialog').classList.add('hidden');
+        });
+
+        // 创建项目
+        document.getElementById('create-project-btn').addEventListener('click', () => {
+            this.showCreateProjectDialog();
+        });
+
+        // 项目表单提交
+        document.getElementById('project-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.handleProjectFormSubmit();
+        });
+
+        // 取消项目表单
+        document.getElementById('cancel-project-btn').addEventListener('click', () => {
+            document.getElementById('project-form-dialog').classList.add('hidden');
+        });
+    },
+
+    /**
+     * 更新项目选择器
+     * @param {Array} projects - 项目列表
+     * @param {number} currentProjectId - 当前项目ID
+     */
+    updateProjectSelector(projects, currentProjectId) {
+        const select = document.getElementById('project-select');
+        select.innerHTML = '';
+
+        projects.forEach(p => {
+            const option = document.createElement('option');
+            option.value = p.id;
+            option.textContent = `${p.name} (${p.task_count})`;
+            if (p.id === currentProjectId) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+
+        this.projects = projects;
+    },
+
+    /**
+     * 显示项目管理对话框
+     */
+    showProjectDialog() {
+        const projectList = document.getElementById('project-list');
+        projectList.innerHTML = '';
+
+        this.projects.forEach(p => {
+            const item = document.createElement('div');
+            item.className = 'project-item';
+            item.innerHTML = `
+                <div class="project-info">
+                    <span class="project-color" style="background-color: ${p.color}"></span>
+                    <div class="project-details">
+                        <div class="project-name">${p.name}</div>
+                        <div class="project-meta">${p.task_count} 个任务</div>
+                    </div>
+                </div>
+                <div class="project-actions">
+                    <button class="btn btn-sm btn-edit" data-id="${p.id}">编辑</button>
+                    <button class="btn btn-sm btn-delete" data-id="${p.id}">删除</button>
+                </div>
+            `;
+
+            item.querySelector('.btn-edit').addEventListener('click', () => {
+                this.showEditProjectDialog(p);
+            });
+
+            item.querySelector('.btn-delete').addEventListener('click', async () => {
+                await this.deleteProject(p);
+            });
+
+            projectList.appendChild(item);
+        });
+
+        document.getElementById('project-dialog').classList.remove('hidden');
+    },
+
+    /**
+     * 显示创建项目对话框
+     */
+    showCreateProjectDialog() {
+        document.getElementById('project-form-title').textContent = '创建项目';
+        document.getElementById('project-id').value = '';
+        document.getElementById('project-form').reset();
+        document.getElementById('project-color').value = '#2196f3';
+        document.getElementById('project-form-dialog').classList.remove('hidden');
+    },
+
+    /**
+     * 显示编辑项目对话框
+     * @param {Object} project - 项目对象
+     */
+    showEditProjectDialog(project) {
+        document.getElementById('project-form-title').textContent = '编辑项目';
+        document.getElementById('project-id').value = project.id;
+        document.getElementById('project-name').value = project.name;
+        document.getElementById('project-description').value = project.description || '';
+        document.getElementById('project-color').value = project.color;
+        document.getElementById('project-form-dialog').classList.remove('hidden');
+    },
+
+    /**
+     * 处理项目表单提交
+     */
+    async handleProjectFormSubmit() {
+        const projectId = document.getElementById('project-id').value;
+        const data = {
+            name: document.getElementById('project-name').value,
+            description: document.getElementById('project-description').value,
+            color: document.getElementById('project-color').value
+        };
+
+        try {
+            if (projectId) {
+                await API.updateProject(parseInt(projectId), data);
+                this.showToast('项目更新成功');
+            } else {
+                await API.createProject(data);
+                this.showToast('项目创建成功');
+            }
+
+            document.getElementById('project-form-dialog').classList.add('hidden');
+            document.getElementById('project-dialog').classList.add('hidden');
+
+            await app.loadProjects();
+        } catch (error) {
+            this.showToast(error.message, 'error');
+        }
+    },
+
+    /**
+     * 删除项目
+     * @param {Object} project - 项目对象
+     */
+    async deleteProject(project) {
+        if (project.task_count > 0) {
+            this.showToast(`无法删除：项目 "${project.name}" 还有 ${project.task_count} 个任务`, 'error');
+            return;
+        }
+
+        if (!confirm(`确定要删除项目 "${project.name}" 吗？`)) return;
+
+        try {
+            await API.deleteProject(project.id);
+            this.showToast('项目删除成功');
+
+            if (app.currentProjectId === project.id) {
+                const remainingProjects = this.projects.filter(p => p.id !== project.id);
+                if (remainingProjects.length > 0) {
+                    await app.switchProject(remainingProjects[0].id);
+                }
+            }
+
+            await app.loadProjects();
+            document.getElementById('project-dialog').classList.add('hidden');
+        } catch (error) {
+            this.showToast(error.message, 'error');
+        }
     }
 };

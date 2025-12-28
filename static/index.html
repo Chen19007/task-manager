@@ -10,6 +10,13 @@
     <!-- 顶部工具栏 -->
     <header id="toolbar">
         <h1>任务依赖图</h1>
+
+        <!-- Project 切换器 -->
+        <div class="project-switcher">
+            <select id="project-select" class="project-select"></select>
+            <button id="manage-projects-btn" class="btn btn-icon" title="管理项目">⚙️</button>
+        </div>
+
         <div class="toolbar-buttons">
             <button id="add-task-btn" class="btn btn-primary">＋ 添加任务</button>
             <button id="refresh-btn" class="btn btn-secondary">刷新</button>
@@ -98,6 +105,44 @@
             <div class="form-buttons">
                 <button type="button" id="remove-dep-cancel-btn" class="btn btn-secondary">取消</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 项目管理对话框 -->
+    <div id="project-dialog" class="modal hidden">
+        <div class="modal-content">
+            <h2>项目管理</h2>
+            <div id="project-list" class="project-list"></div>
+            <div class="form-buttons">
+                <button id="create-project-btn" class="btn btn-primary">创建新项目</button>
+                <button id="close-project-dialog-btn" class="btn btn-secondary">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 项目创建/编辑对话框 -->
+    <div id="project-form-dialog" class="modal hidden">
+        <div class="modal-content">
+            <h2 id="project-form-title">创建项目</h2>
+            <form id="project-form">
+                <input type="hidden" id="project-id">
+                <div class="form-group">
+                    <label for="project-name">项目名称</label>
+                    <input type="text" id="project-name" required maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label for="project-description">项目描述</label>
+                    <textarea id="project-description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="project-color">颜色标签</label>
+                    <input type="color" id="project-color" value="#2196f3">
+                </div>
+                <div class="form-buttons">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <button type="button" id="cancel-project-btn" class="btn btn-secondary">取消</button>
+                </div>
+            </form>
         </div>
     </div>
 

@@ -109,6 +109,36 @@ body {
 .legend-item.in_progress { color: var(--color-in-progress-border); }
 .legend-item.completed { color: var(--color-completed-border); }
 
+/* Project 切换器 */
+.project-switcher {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 20px;
+}
+
+.project-select {
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 180px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.project-select:focus {
+    outline: none;
+    border-color: var(--color-pending-border);
+}
+
+.btn-icon {
+    padding: 8px 12px;
+    font-size: 16px;
+    background: #f5f5f5;
+}
+
 /* ==================== 主绘图区域 ==================== */
 #graph-container {
     flex: 1;
@@ -435,6 +465,109 @@ body {
 .toast.error {
     background: #f44336;
     color: white;
+}
+
+/* ==================== 项目管理样式 ==================== */
+.project-list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    margin-bottom: 16px;
+}
+
+.project-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.project-item:last-child {
+    border-bottom: none;
+}
+
+.project-item:hover {
+    background: #f9f9f9;
+}
+
+.project-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.project-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.project-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.project-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+.project-meta {
+    font-size: 13px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.project-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-sm:hover {
+    background: #f5f5f5;
+}
+
+.btn-edit {
+    color: #2196f3;
+    border-color: #2196f3;
+}
+
+.btn-edit:hover {
+    background: #e3f2fd;
+}
+
+.btn-delete {
+    color: #f44336;
+    border-color: #f44336;
+}
+
+.btn-delete:hover {
+    background: #ffebee;
+}
+
+/* 颜色选择器 */
+input[type="color"] {
+    width: 100%;
+    height: 40px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 4px;
 }
 
 /* ==================== 滚动条样式 ==================== */

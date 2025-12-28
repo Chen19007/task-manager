@@ -6,6 +6,8 @@ class App {
     constructor() {
         this.tasks = [];
         this.layout = {};
+        this.projects = [];
+        this.currentProjectId = null;
     }
 
     /**
@@ -19,11 +21,55 @@ class App {
             // 初始化交互处理
             Interaction.init();
 
-            // 加载数据
+            // 加载项目列表
+            await this.loadProjects();
+
+            // 加载当前项目的任务
             await this.loadData();
         } catch (error) {
             this.showError('应用初始化失败：' + error.message);
         }
+    }
+
+    /**
+     * 加载项目列表
+     */
+    async loadProjects() {
+        try {
+            this.projects = await API.fetchAllProjects();
+
+            // 如果没有项目，创建默认项目
+            if (this.projects.length === 0) {
+                const defaultProject = await API.createProject({
+                    name: '默认项目',
+                    description: '系统自动创建的默认项目',
+                    color: '#2196f3'
+                });
+                this.projects.push(defaultProject);
+            }
+
+            // 设置当前项目
+            if (this.currentProjectId === null && this.projects.length > 0) {
+                this.currentProjectId = this.projects[0].id;
+            }
+
+            // 更新 UI
+            Interaction.updateProjectSelector(this.projects, this.currentProjectId);
+        } catch (error) {
+            this.showError('加载项目失败：' + error.message);
+        }
+    }
+
+    /**
+     * 切换项目
+     * @param {number} projectId - 项目ID
+     */
+    async switchProject(projectId) {
+        if (this.currentProjectId === projectId) return;
+
+        this.currentProjectId = projectId;
+        await this.loadData();
+        Interaction.updateProjectSelector(this.projects, this.currentProjectId);
     }
 
     /**
@@ -34,8 +80,8 @@ class App {
         loading.classList.remove('hidden');
 
         try {
-            // 获取所有任务
-            this.tasks = await API.fetchAllTasks();
+            // 获取当前项目的任务
+            this.tasks = await API.fetchAllTasks(this.currentProjectId);
 
             // 计算布局
             this.layout = Layout.computeLayout(this.tasks);
