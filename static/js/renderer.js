@@ -232,6 +232,9 @@ const Renderer = {
             const taskEl = this.createTaskElement(task, layout[task.id]);
             this.layers.tasks.appendChild(taskEl);
         });
+
+        // 更新 SVG 尺寸以支持滚动
+        this.updateSvgSize(tasks, layout);
     },
 
     /**
@@ -255,6 +258,33 @@ const Renderer = {
             const color = this.connectionColors[index % this.connectionColors.length];
             conn.style.stroke = color;
         });
+    },
+
+    /**
+     * 计算并更新 SVG 尺寸以支持滚动
+     */
+    updateSvgSize(tasks, layout) {
+        if (tasks.length === 0) return;
+
+        // 找出最右下角的位置
+        let maxX = 0;
+        let maxY = 0;
+        tasks.forEach(task => {
+            const pos = layout[task.id];
+            if (pos) {
+                maxX = Math.max(maxX, pos.x + Layout.CONFIG.gridWidth);
+                maxY = Math.max(maxY, pos.y + Layout.CONFIG.gridHeight);
+            }
+        });
+
+        // 添加额外边距
+        const extraMargin = 50;
+        const width = maxX + extraMargin;
+        const height = maxY + extraMargin;
+
+        // 设置 SVG 尺寸
+        this.svg.setAttribute('width', width);
+        this.svg.setAttribute('height', height);
     },
 
     /**
