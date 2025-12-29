@@ -487,6 +487,31 @@ const Interaction = {
     },
 
     /**
+     * 显示连线 offset 悬浮框
+     */
+    showOffsetTooltip(x, y, offset) {
+        const tooltip = document.getElementById('tooltip');
+        const content = document.getElementById('tooltip-content');
+
+        content.innerHTML = `<div class="tooltip-item">offset: ${offset}px</div>`;
+
+        let posX = x + 15;
+        let posY = y + 15;
+
+        tooltip.style.left = `${posX}px`;
+        tooltip.style.top = `${posY}px`;
+        tooltip.classList.remove('hidden');
+    },
+
+    /**
+     * 隐藏连线 offset 悬浮框
+     */
+    hideOffsetTooltip() {
+        const tooltip = document.getElementById('tooltip');
+        tooltip.classList.add('hidden');
+    },
+
+    /**
      * 设置项目管理
      */
     setupProjectManagement() {

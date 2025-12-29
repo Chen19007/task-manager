@@ -100,52 +100,52 @@ const Renderer = {
         if (columnDiff > 0) {
             if (rowDiff > 0) {
                 points.push(sourceGrid.bottomRight);
-                corners.push({ taskId: sourceId, cornerName: 'bottomRight' });
+                corners.push({ taskId: sourceId, cornerName: 'bottomRight', x: sourceGrid.bottomRight.x, y: sourceGrid.bottomRight.y });
                 points.push({ x: targetGrid.topLeft.x, y: sourceGrid.bottomRight.y });
                 points.push(targetGrid.topLeft);
-                corners.push({ taskId: targetId, cornerName: 'topLeft' });
+                corners.push({ taskId: targetId, cornerName: 'topLeft', x: targetGrid.topLeft.x, y: targetGrid.topLeft.y });
             } else if (rowDiff < 0) {
                 points.push(sourceGrid.topRight);
-                corners.push({ taskId: sourceId, cornerName: 'topRight' });
+                corners.push({ taskId: sourceId, cornerName: 'topRight', x: sourceGrid.topRight.x, y: sourceGrid.topRight.y });
                 points.push({ x: targetGrid.bottomLeft.x, y: sourceGrid.topRight.y });
                 points.push(targetGrid.bottomLeft);
-                corners.push({ taskId: targetId, cornerName: 'bottomLeft' });
+                corners.push({ taskId: targetId, cornerName: 'bottomLeft', x: targetGrid.bottomLeft.x, y: targetGrid.bottomLeft.y });
             } else {
                 points.push(sourceGrid.topRight);
-                corners.push({ taskId: sourceId, cornerName: 'topRight' });
+                corners.push({ taskId: sourceId, cornerName: 'topRight', x: sourceGrid.topRight.x, y: sourceGrid.topRight.y });
                 points.push(targetGrid.topLeft);
-                corners.push({ taskId: targetId, cornerName: 'topLeft' });
+                corners.push({ taskId: targetId, cornerName: 'topLeft', x: targetGrid.topLeft.x, y: targetGrid.topLeft.y });
             }
         } else if (columnDiff < 0) {
             if (rowDiff > 0) {
                 points.push(sourceGrid.bottomLeft);
-                corners.push({ taskId: sourceId, cornerName: 'bottomLeft' });
+                corners.push({ taskId: sourceId, cornerName: 'bottomLeft', x: sourceGrid.bottomLeft.x, y: sourceGrid.bottomLeft.y });
                 points.push({ x: targetGrid.topRight.x, y: sourceGrid.bottomLeft.y });
                 points.push(targetGrid.topRight);
-                corners.push({ taskId: targetId, cornerName: 'topRight' });
+                corners.push({ taskId: targetId, cornerName: 'topRight', x: targetGrid.topRight.x, y: targetGrid.topRight.y });
             } else if (rowDiff < 0) {
                 points.push(sourceGrid.topLeft);
-                corners.push({ taskId: sourceId, cornerName: 'topLeft' });
+                corners.push({ taskId: sourceId, cornerName: 'topLeft', x: sourceGrid.topLeft.x, y: sourceGrid.topLeft.y });
                 points.push({ x: targetGrid.bottomRight.x, y: sourceGrid.topLeft.y });
                 points.push(targetGrid.bottomRight);
-                corners.push({ taskId: targetId, cornerName: 'bottomRight' });
+                corners.push({ taskId: targetId, cornerName: 'bottomRight', x: targetGrid.bottomRight.x, y: targetGrid.bottomRight.y });
             } else {
                 points.push(sourceGrid.topLeft);
-                corners.push({ taskId: sourceId, cornerName: 'topLeft' });
+                corners.push({ taskId: sourceId, cornerName: 'topLeft', x: sourceGrid.topLeft.x, y: sourceGrid.topLeft.y });
                 points.push(targetGrid.topRight);
-                corners.push({ taskId: targetId, cornerName: 'topRight' });
+                corners.push({ taskId: targetId, cornerName: 'topRight', x: targetGrid.topRight.x, y: targetGrid.topRight.y });
             }
         } else {
             if (rowDiff > 0) {
                 points.push(sourceGrid.topLeft);
-                corners.push({ taskId: sourceId, cornerName: 'topLeft' });
+                corners.push({ taskId: sourceId, cornerName: 'topLeft', x: sourceGrid.topLeft.x, y: sourceGrid.topLeft.y });
                 points.push(targetGrid.bottomLeft);
-                corners.push({ taskId: targetId, cornerName: 'bottomLeft' });
+                corners.push({ taskId: targetId, cornerName: 'bottomLeft', x: targetGrid.bottomLeft.x, y: targetGrid.bottomLeft.y });
             } else if (rowDiff < 0) {
                 points.push(sourceGrid.bottomLeft);
-                corners.push({ taskId: sourceId, cornerName: 'bottomLeft' });
+                corners.push({ taskId: sourceId, cornerName: 'bottomLeft', x: sourceGrid.bottomLeft.x, y: sourceGrid.bottomLeft.y });
                 points.push(targetGrid.topLeft);
-                corners.push({ taskId: targetId, cornerName: 'topLeft' });
+                corners.push({ taskId: targetId, cornerName: 'topLeft', x: targetGrid.topLeft.x, y: targetGrid.topLeft.y });
             }
         }
 
@@ -162,34 +162,48 @@ const Renderer = {
 
     /**
      * 根据路径经过的角获取 offset（打点数组方式）
-     * @param {Array} corners - 路径经过的角 [{ taskId, cornerName }, ...]
+     * @param {Array} corners - 路径经过的角 [{ taskId, cornerName, x, y }, ...]
      * @returns {number} offset 值
      */
     getOffsetForPath(corners) {
         if (corners.length === 0) return 0;
 
-        const dotCount = Layout.CONFIG.connectionDotCount || 10;
-        const offsetUnit = Layout.CONFIG.connectionOffsetUnit || 5;
+        // 在 corners 数组本身上标记已使用的打点索引（每条线独立管理）
+        if (!corners.usedDots) {
+            corners.usedDots = new Set();
+        }
 
-        // 初始化打点数组（如果不存在）
-        corners.forEach(({ taskId, cornerName }) => {
-            const key = `${taskId}_${cornerName}`;
+        const dotCount = Layout.CONFIG.connectionDotCount || 10;
+        const offsetUnit = Layout.CONFIG.connectionOffsetUnit || 3;
+
+        // 初始化打点数组（如果不存在）- 使用物理坐标作为 key
+        corners.forEach(({ x, y }) => {
+            const key = `${x}_${y}`;
             if (!this.cornerDots[key]) {
                 this.cornerDots[key] = new Array(dotCount).fill(false);
             }
         });
 
-        // 遍历打点数组，找到第一个所有角都可用的 index
+        // 遍历打点数组，找到第一个可用的 index
         for (let index = 0; index < dotCount; index++) {
-            const allAvailable = corners.every(({ taskId, cornerName }) => {
-                const key = `${taskId}_${cornerName}`;
+            // 检查 corners 上是否标记为已使用
+            if (corners.usedDots.has(index)) {
+                continue;
+            }
+
+            // 检查所有角在该 index 是否都可用 - 使用物理坐标 key
+            const allAvailable = corners.every(({ x, y }) => {
+                const key = `${x}_${y}`;
                 return this.cornerDots[key][index] === false;
             });
 
             if (allAvailable) {
-                // 找到可用位置，标记为已使用
-                corners.forEach(({ taskId, cornerName }) => {
-                    const key = `${taskId}_${cornerName}`;
+                // 标记该 index 已使用
+                corners.usedDots.add(index);
+
+                // 标记打点数组 - 使用物理坐标 key
+                corners.forEach(({ x, y }) => {
+                    const key = `${x}_${y}`;
                     this.cornerDots[key][index] = true;
                 });
 
@@ -235,6 +249,7 @@ const Renderer = {
         path.setAttribute('class', highlighted ? 'connection-highlight' : 'connection');
         path.setAttribute('data-source', sourceId);
         path.setAttribute('data-target', targetId);
+        path.setAttribute('data-offset', offsetY);
         // 去掉箭头
         // path.setAttribute('marker-end', highlighted ? 'url(#arrowhead-highlight)' : 'url(#arrowhead)');
 
@@ -298,6 +313,23 @@ const Renderer = {
 
         // 整体调整连接线样式
         this.adjustConnectionStyles(highlightedEdges);
+
+        // 添加连线悬浮事件
+        const connections = this.layers.connections.querySelectorAll('.connection, .connection-highlight');
+        connections.forEach(conn => {
+            conn.style.pointerEvents = 'stroke';
+
+            conn.addEventListener('mouseenter', (e) => {
+                const offset = e.target.getAttribute('data-offset');
+                if (offset !== null) {
+                    Interaction.showOffsetTooltip(e.clientX, e.clientY, parseFloat(offset));
+                }
+            });
+
+            conn.addEventListener('mouseleave', () => {
+                Interaction.hideOffsetTooltip();
+            });
+        });
 
         // 渲染任务方块
         tasks.forEach(task => {
