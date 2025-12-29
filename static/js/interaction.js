@@ -436,12 +436,36 @@ const Interaction = {
         // 清空现有内容
         content.innerHTML = '';
 
-        // 添加依赖任务列表
+        // 1. 添加任务标题
+        const header = document.createElement('div');
+        header.className = 'tooltip-header';
+        header.textContent = task.title;
+        content.appendChild(header);
+
+        // 2. 添加任务描述
+        if (task.description) {
+            const desc = document.createElement('div');
+            desc.className = 'tooltip-item';
+            desc.textContent = task.description;
+            content.appendChild(desc);
+        }
+
+        // 3. 添加依赖列表标题
+        if (task.dependencies.length > 0) {
+            const depHeader = document.createElement('div');
+            depHeader.className = 'tooltip-header';
+            depHeader.style.marginTop = '16px';
+            depHeader.textContent = '任务依赖:';
+            content.appendChild(depHeader);
+        }
+
+        // 4. 添加依赖任务列表
         task.dependencies.forEach(depId => {
             const depTask = this.tasks.find(t => t.id === depId);
             if (depTask) {
                 const item = document.createElement('div');
                 item.className = 'tooltip-item';
+                item.style.cssText = 'font-size: 13px; color: #555; margin: 4px 0;';
                 item.textContent = depTask.title;
 
                 // 点击跳转功能（高亮选中该依赖任务）
@@ -487,13 +511,18 @@ const Interaction = {
     },
 
     /**
-     * 显示连线 offset 悬浮框
+     * 显示连线依赖关系悬浮框
      */
-    showOffsetTooltip(x, y, offset) {
+    showConnectionTooltip(x, y, sourceTitle, targetTitle) {
         const tooltip = document.getElementById('tooltip');
         const content = document.getElementById('tooltip-content');
 
-        content.innerHTML = `<div class="tooltip-item">offset: ${offset}px</div>`;
+        content.innerHTML = `
+            <div class="tooltip-item">
+                <span style="color: #888;">依赖:</span><br>
+                ${sourceTitle} → ${targetTitle}
+            </div>
+        `;
 
         let posX = x + 15;
         let posY = y + 15;
@@ -504,9 +533,9 @@ const Interaction = {
     },
 
     /**
-     * 隐藏连线 offset 悬浮框
+     * 隐藏连线悬浮框
      */
-    hideOffsetTooltip() {
+    hideConnectionTooltip() {
         const tooltip = document.getElementById('tooltip');
         tooltip.classList.add('hidden');
     },

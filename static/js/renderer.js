@@ -241,6 +241,12 @@ const Renderer = {
         // 计算基础路径
         const { points } = this.calculateBasePath(sourceLayout, targetLayout);
 
+        // 获取任务标题用于悬浮显示
+        const sourceTask = this.tasks?.find(t => t.id === sourceId);
+        const targetTask = this.tasks?.find(t => t.id === targetId);
+        const sourceTitle = sourceTask?.title || `任务 ${sourceId}`;
+        const targetTitle = targetTask?.title || `任务 ${targetId}`;
+
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         const offsetPath = this.applyOffset(points, 0, offsetY);
         path.setAttribute('d', offsetPath.map((p, i) => {
@@ -250,6 +256,8 @@ const Renderer = {
         path.setAttribute('data-source', sourceId);
         path.setAttribute('data-target', targetId);
         path.setAttribute('data-offset', offsetY);
+        path.setAttribute('data-source-title', sourceTitle);
+        path.setAttribute('data-target-title', targetTitle);
         // 去掉箭头
         // path.setAttribute('marker-end', highlighted ? 'url(#arrowhead-highlight)' : 'url(#arrowhead)');
 
@@ -261,6 +269,7 @@ const Renderer = {
      */
     render(tasks, layout, highlightedEdges = new Set()) {
         this.clear();
+        this.tasks = tasks;  // 保存 tasks 供 createConnectionElement 使用
         this.initCornerDots();  // 初始化角打点数组
 
         // 渲染九宫格
@@ -320,14 +329,15 @@ const Renderer = {
             conn.style.pointerEvents = 'stroke';
 
             conn.addEventListener('mouseenter', (e) => {
-                const offset = e.target.getAttribute('data-offset');
-                if (offset !== null) {
-                    Interaction.showOffsetTooltip(e.clientX, e.clientY, parseFloat(offset));
+                const sourceTitle = e.target.getAttribute('data-source-title');
+                const targetTitle = e.target.getAttribute('data-target-title');
+                if (sourceTitle && targetTitle) {
+                    Interaction.showConnectionTooltip(e.clientX, e.clientY, sourceTitle, targetTitle);
                 }
             });
 
             conn.addEventListener('mouseleave', () => {
-                Interaction.hideOffsetTooltip();
+                Interaction.hideConnectionTooltip();
             });
         });
 
