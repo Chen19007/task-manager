@@ -5,7 +5,7 @@
 const Renderer = {
     svg: null,
     layers: {},
-    cornerUsage: {},  // 角使用计数 { "taskId_cornerName": count }
+    cornerDots: {},  // 角打点数组 { "taskId_cornerName": [false, false, ...] }
 
     // 连接线调色板（循环使用）
     connectionColors: ['#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#f39c12', '#1abc9c', '#e91e63', '#00bcd4'],
@@ -154,39 +154,55 @@ const Renderer = {
     },
 
     /**
-     * 初始化角使用计数
+     * 初始化角打点数组
      */
-    initCornerUsage() {
-        this.cornerUsage = {};
+    initCornerDots() {
+        this.cornerDots = {};
     },
 
     /**
-     * 标记路径经过的角（计数加1）
-     */
-    markCornerUsed(taskId, cornerName) {
-        const key = `${taskId}_${cornerName}`;
-        this.cornerUsage[key] = (this.cornerUsage[key] || 0) + 1;
-    },
-
-    /**
-     * 根据路径经过的角获取 offset
+     * 根据路径经过的角获取 offset（打点数组方式）
      * @param {Array} corners - 路径经过的角 [{ taskId, cornerName }, ...]
      * @returns {number} offset 值
      */
     getOffsetForPath(corners) {
         if (corners.length === 0) return 0;
 
-        // 找到经过的角中最大的使用次数
-        let maxUsage = 0;
+        const dotCount = Layout.CONFIG.connectionDotCount || 10;
+        const offsetUnit = Layout.CONFIG.connectionOffsetUnit || 5;
+
+        // 初始化打点数组（如果不存在）
         corners.forEach(({ taskId, cornerName }) => {
             const key = `${taskId}_${cornerName}`;
-            maxUsage = Math.max(maxUsage, this.cornerUsage[key] || 0);
+            if (!this.cornerDots[key]) {
+                this.cornerDots[key] = new Array(dotCount).fill(false);
+            }
         });
 
-        // 返回 offset：偶数向上，奇数向下
-        const offsetAmount = 2;
-        const direction = maxUsage % 2 === 0 ? -1 : 1;
-        return maxUsage * offsetAmount * direction;
+        // 遍历打点数组，找到第一个所有角都可用的 index
+        for (let index = 0; index < dotCount; index++) {
+            const allAvailable = corners.every(({ taskId, cornerName }) => {
+                const key = `${taskId}_${cornerName}`;
+                return this.cornerDots[key][index] === false;
+            });
+
+            if (allAvailable) {
+                // 找到可用位置，标记为已使用
+                corners.forEach(({ taskId, cornerName }) => {
+                    const key = `${taskId}_${cornerName}`;
+                    this.cornerDots[key][index] = true;
+                });
+
+                // 返回 offset：偶数向上(-)，奇数向下(+)
+                const direction = index % 2 === 0 ? -1 : 1;
+                return index * offsetUnit * direction;
+            }
+        }
+
+        // 所有打点都被占用，返回最大偏移（兜底）
+        const lastIndex = dotCount - 1;
+        const direction = lastIndex % 2 === 0 ? -1 : 1;
+        return lastIndex * offsetUnit * direction;
     },
 
     /**
@@ -230,7 +246,7 @@ const Renderer = {
      */
     render(tasks, layout, highlightedEdges = new Set()) {
         this.clear();
-        this.initCornerUsage();  // 初始化角使用计数
+        this.initCornerDots();  // 初始化角打点数组
 
         // 渲染九宫格
         tasks.forEach(task => {
@@ -255,9 +271,6 @@ const Renderer = {
                     offset,
                     key: `${depId}-${task.id}`
                 });
-
-                // 标记这些角将被使用
-                corners.forEach(c => this.markCornerUsed(c.taskId, c.cornerName));
             });
         });
 

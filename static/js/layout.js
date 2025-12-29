@@ -12,7 +12,10 @@ const Layout = {
         columnWidth: 200,
         rowHeight: 160,
         marginLeft: 50,
-        marginTop: 100
+        marginTop: 100,
+        // 连线防重叠配置
+        connectionDotCount: 10,       // 每个角可用的打点数量
+        connectionOffsetUnit: 5     // 每个打点的偏移量（px）
     },
 
     /**
